@@ -1,6 +1,7 @@
 #!/bin/python
 
 import os
+import pickle
 import requests
 import subprocess
 import sys
@@ -72,59 +73,18 @@ def download_and_extract_archive(url, label="temp"):
 
 
 class Builder:
+    """
+    Class members:
+    - cmake_binary;
+    - ninja_binary;
+    - c_compiler;
+    - cxx_compiler;
+    - prefixes: dict from str (library label) to str (library prefix).
+    """
 
-    def download_cmake(self, version="3.21.1"):
-        if self.platform == "Linux":
-            suffix = "Linux-x86_64.tar.gz"
-            dirname = "cmake-{}-linux-x86_64".format(version)
-            self.cmake_binary = os.path.join(dirname, "bin", "cmake")
-        elif self.platform == "macOS":
-            suffix = "Darwin-x86_64.tar.gz"
-            dirname = "cmake-{}-Darwin-x86_64".format(version)
-            self.cmake_binary = os.path.join(dirname, "CMake.app", "Contents", "bin", "cmake")
-        elif self.platform == "Windows":
-            suffix = "win64-x64.zip"
-            dirname = "cmake-{}-win64-x64".format(version)
-            self.cmake_binary = os.path.join(dirname, "bin", "cmake.exe")
-        else:
-            raise RuntimeError("Unknown platform {}".format(self.platform))
-
-        url = "https://github.com/Kitware/CMake/releases/download/v{}/cmake-{}-{}".format(version, version, suffix)
-        download_and_extract_archive(url=url, label="cmake")
-        self.cmake_binary = os.path.abspath(self.cmake_binary)
-
-
-    def download_ninja(self, version="1.10.2"):
-        if self.platform == "Linux":
-            suffix = "linux.zip"
-            self.ninja_binary = "ninja"
-        elif self.platform == "macOS":
-            suffix = "mac.zip"
-            self.ninja_binary = "ninja"
-        elif self.platform == "Windows":
-            suffix = "win.zip"
-            self.ninja_binary = "ninja.exe"
-        else:
-            raise RuntimeError("Unknown platform {}".format(self.platform))
-
-        url = "https://github.com/ninja-build/ninja/releases/download/v{}/ninja-{}".format(version, suffix)
-        download_and_extract_archive(url=url, label="ninja")
-        self.ninja_binary = os.path.abspath(self.ninja_binary)
-
-
-    def __init__(self, c_compiler=None, cxx_compiler=None,
-                 cmake_version=None, ninja_version=None, platform=None):
+    def __init__(self, c_compiler=None, cxx_compiler=None, platform=None):
         self.platform = get_platform()
-
-        if cmake_version is None:
-            self.download_cmake()
-        else:
-            self.download_cmake(cmake_version)
-
-        if ninja_version is None:
-            self.download_ninja()
-        else:
-            self.download_ninja(ninja_version)
+        self.prefixes = dict()
 
         if c_compiler is None:
             try:
@@ -142,7 +102,8 @@ class Builder:
         else:
             self.cxx_compiler = cxx_compiler
 
-
+    
+    """Configure, build and install project with CMake; return installation prefix."""
     def build_cmake(self, source_dir, cmake_params=None, prefix_dir=None,
                     build_dir=None, build_type="Release"):
 
@@ -167,7 +128,7 @@ class Builder:
 
         return prefix_dir
 
-
+    """Configure project with configure script, build and install with make; return installation prefix."""
     def build_make(self, source_dir, configure_params=None,
                    prefix_dir=None, prefix_arg="--prefix", build_dir=None):
 
@@ -189,49 +150,99 @@ class Builder:
         return prefix_dir
 
 
+    """Download CMake and store cmake executable path as cmake_binary class member."""
+    def download_cmake(self, version="3.21.1"):
+        if self.platform == "Linux":
+            suffix = "Linux-x86_64.tar.gz"
+            dirname = "cmake-{}-linux-x86_64".format(version)
+            self.cmake_binary = os.path.join(dirname, "bin", "cmake")
+        elif self.platform == "macOS":
+            suffix = "Darwin-x86_64.tar.gz"
+            dirname = "cmake-{}-Darwin-x86_64".format(version)
+            self.cmake_binary = os.path.join(dirname, "CMake.app", "Contents", "bin", "cmake")
+        elif self.platform == "Windows":
+            suffix = "win64-x64.zip"
+            dirname = "cmake-{}-win64-x64".format(version)
+            self.cmake_binary = os.path.join(dirname, "bin", "cmake.exe")
+        else:
+            raise RuntimeError("Unknown platform {}".format(self.platform))
+
+        url = "https://github.com/Kitware/CMake/releases/download/v{}/cmake-{}-{}".format(version, version, suffix)
+        download_and_extract_archive(url=url, label="cmake")
+        self.cmake_binary = os.path.abspath(self.cmake_binary)
+
+
+    """Download Ninja build tools and store ninja executable path as ninja_binary class member."""
+    def download_ninja(self, version="1.10.2"):
+        if self.platform == "Linux":
+            suffix = "linux.zip"
+            self.ninja_binary = "ninja"
+        elif self.platform == "macOS":
+            suffix = "mac.zip"
+            self.ninja_binary = "ninja"
+        elif self.platform == "Windows":
+            suffix = "win.zip"
+            self.ninja_binary = "ninja.exe"
+        else:
+            raise RuntimeError("Unknown platform {}".format(self.platform))
+
+        url = "https://github.com/ninja-build/ninja/releases/download/v{}/ninja-{}".format(version, suffix)
+        download_and_extract_archive(url=url, label="ninja")
+        self.ninja_binary = os.path.abspath(self.ninja_binary)
+
+
+    def get_prefix(key):
+        try:
+            return self.prefixes[key]
+        except KeyError:
+            return ""
+
+
     def build_yaml_cpp(self, version="0.6.3", prefix_dir=None):
         url = "https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-{}.tar.gz".format(version)
         download_and_extract_archive(url=url, label="yaml_cpp")
 
         source_dir = "yaml-cpp-yaml-cpp-{}".format(version)
-        return self.build_cmake(source_dir=source_dir,
-                                cmake_params="-D YAML_BUILD_SHARED_LIBS=ON "
-                                             "-D YAML_CPP_BUILD_TESTS=OFF ",
-                                prefix_dir=prefix_dir)
+        self.prefixes['yaml-cpp'] = self.build_cmake(source_dir=source_dir,
+                                                     cmake_params="-D YAML_BUILD_SHARED_LIBS=ON "
+                                                                  "-D YAML_CPP_BUILD_TESTS=OFF ",
+                                                     prefix_dir=prefix_dir)
 
 
-    def build_sqlpp11_base(self, version="0.60", prefix_dir=None):
+    def build_sqlpp11(self, version="0.60", prefix_dir=None):
         url = "https://github.com/rbock/sqlpp11/archive/{}.tar.gz".format(version)
-        download_and_extract_archive(url=url, label="sqlpp11_base")
+        download_and_extract_archive(url=url, label="sqlpp11")
 
         source_dir = "sqlpp11-{}".format(version)
-        return self.build_cmake(source_dir=source_dir,
-                                cmake_params="-D BUILD_TESTING=OFF",
-                                prefix_dir=prefix_dir)
+        self.prefixes['sqlpp11'] = self.build_cmake(source_dir=source_dir,
+                                                    cmake_params="-D BUILD_TESTING=OFF",
+                                                    prefix_dir=prefix_dir)
 
 
-    def build_chrono_date(self, version="3.0.0", prefix_dir=None):
+    def build_date(self, version="3.0.0", prefix_dir=None):
         url = "https://github.com/HowardHinnant/date/archive/v{}.tar.gz".format(version)
-        download_and_extract_archive(url=url, label="chrono_date")
+        download_and_extract_archive(url=url, label="date")
 
         source_dir = "date-{}".format(version)
-        return self.build_cmake(source_dir=source_dir,
-                                prefix_dir=prefix_dir)
+        self.prefixes['date'] = self.build_cmake(source_dir=source_dir,
+                                                 prefix_dir=prefix_dir)
 
 
-    def build_sqlpp11_connector_mysql(self, version="0.29", prefix_dir=None,
-                                      sqlpp11_base_prefix="/usr", chrono_date_prefix="/usr"):
+    def build_sqlpp11_connector_mysql(self, version="0.29", prefix_dir=None):
         url = "https://github.com/rbock/sqlpp11-connector-mysql/archive/{}.tar.gz".format(version)
         download_and_extract_archive(url=url, label="sqlpp11_connector_mysql")
 
+        sqlpp11_prefix = get_prefix("sqlpp11")
+        date_prefix = get_prefix("date")
+
         source_dir = "sqlpp11-connector-mysql-{}".format(version)
-        return self.build_cmake(source_dir=source_dir,
-                                cmake_params="-D ENABLE_TESTS=OFF " +
-                                             "-D USE_MARIADB=TRUE " +
-                                             "-D SQLPP11_INCLUDE_DIR={}/include ".format(sqlpp11_base_prefix) +
-                                             "-D DATE_INCLUDE_DIR={}/include ".format(chrono_date_prefix) +
-                                             "-D CMAKE_PREFIX_PATH={};{} ".format(sqlpp11_base_prefix, chrono_date_prefix),
-                                prefix_dir=prefix_dir)
+        self.prefixes['sqlpp11-mysql'] = self.build_cmake(source_dir=source_dir,
+                                                          cmake_params="-D ENABLE_TESTS=OFF " +
+                                                                       "-D USE_MARIADB=TRUE " +
+                                                                       "-D SQLPP11_INCLUDE_DIR={}/include ".format(sqlpp11_prefix) +
+                                                                       "-D DATE_INCLUDE_DIR={}/include ".format(date_prefix) +
+                                                                       "-D CMAKE_PREFIX_PATH=\"{};{}\" ".format(sqlpp11_prefix, date_prefix),
+                                                          prefix_dir=prefix_dir)
 
 
     def build_catch2(self, version="2.13.4", prefix_dir=None):
@@ -239,9 +250,9 @@ class Builder:
         download_and_extract_archive(url=url, label="yaml")
 
         source_dir = "Catch2-{}".format(version)
-        return self.build_cmake(source_dir=source_dir,
-                                cmake_params="-D BUILD_TESTING=OFF ",
-                                prefix_dir=prefix_dir)
+        self.prefixes['catch2'] = self.build_cmake(source_dir=source_dir,
+                                                   cmake_params="-D BUILD_TESTING=OFF ",
+                                                   prefix_dir=prefix_dir)
 
 
     def build_boost(self, version="1.76.0", prefix_dir=None):
@@ -278,7 +289,7 @@ class Builder:
                         'install')
 
         os.chdir(current_dir)
-        return prefix_dir
+        self.prefixes['boost'] = prefix_dir
 
 
     def build_cyrus_sasl(self, version="2.1.27", prefix_dir=None):
@@ -286,10 +297,10 @@ class Builder:
         download_and_extract_archive(url=url, label="cyrus_sasl")
 
         source_dir = "cyrus-sasl-{}".format(version)
-        return self.build_make(source_dir=source_dir,
-                               configure_params="--disable-otp " +
-                                                "--with-dblib=gdbm ",
-                               prefix_dir=prefix_dir)
+        self.prefixes['cyrus-sasl'] = self.build_make(source_dir=source_dir,
+                                                      configure_params="--disable-otp " +
+                                                                       "--with-dblib=gdbm ",
+                                                      prefix_dir=prefix_dir)
 
 
     def build_qt5base(self, version="5.15.2", prefix_dir=None):
@@ -299,37 +310,23 @@ class Builder:
         download_and_extract_archive(url=url, label="qt5base")
 
         source_dir = "qtbase-everywhere-src-{}".format(version)
-        return build_make(source_dir=source_dir,
-                        configure_params="-platform linux-g++ " +
-                                         "-c++std c++17 "
-                                         "-opensource " +
-                                         "-confirm-license " +
-                                         "-no-opengl " +
-                                         "-nomake examples " +
-                                         "-nomake tests ",
-                        prefix_dir=prefix_dir,
-                        prefix_arg="-prefix")
+        self.prefixes['qt5base'] = build_make(source_dir=source_dir,
+                                              configure_params="-platform linux-g++ " +
+                                                               "-c++std c++17 "
+                                                               "-opensource " +
+                                                               "-confirm-license " +
+                                                               "-no-opengl " +
+                                                               "-nomake examples " +
+                                                               "-nomake tests ",
+                                              prefix_dir=prefix_dir,
+                                              prefix_arg="-prefix")
 
 
-def main():
-    builder = Builder()
-    yaml_cpp_prefix = builder.build_yaml_cpp()
-    sqlpp11_base_prefix = builder.build_sqlpp11_base()
-    chrono_date_prefix = builder.build_chrono_date()
-
-    # doesn't compile on some distributions due to horrible dependencies resolution
-    sqlpp11_connector_mysql_prefix = build_sqlpp11_connector_mysql(sqlpp11_base_prefix=sqlpp11_base_prefix,
-                                                                   chrono_date_prefix=chrono_date_prefix)
-
-    catch2_prefix = builder.build_catch2()
-
-    boost_prefix = builder.build_boost()
-
-    cyrus_sasl_prefix = builder.build_cyrus_sasl()
-
-    # doesn't compile with gcc 11 because of this bug: https://bugreports.qt.io/browse/QTBUG-90395
-    qt5base_prefix = build_qt5base()
+def load_builder(filename="builder.pkl"):
+    with open(filename, "rb") as picklefile:
+        return pickle.load(picklefile)
 
 
-if __name__ == "__main__":
-    main()
+def save_builder(builder, filename="builder.pkl"):
+    with open(filename, 'wb') as picklefile:
+        pickle.dump(builder, picklefile)
