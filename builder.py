@@ -325,6 +325,24 @@ class Builder:
                                                    prefix_arg="-prefix ")
 
 
+    def build_qt5tools(self, version="5.15.2", prefix_dir=None):
+        version_major, version_minor, version_patch = version.split(".")
+        version_short = "{}.{}".format(version_major, version_minor)
+        url = "http://download.qt.io/official_releases/qt/{}/{}/submodules/qttools-everywhere-src-{}.tar.xz".format(version_short, version, version)
+        download_and_extract_archive(url=url, label="qt5base")
+
+        source_dir = "qttools-everywhere-src-{}".format(version)
+
+        current_dir = os.getcwd()
+        os.chdir(source_dir)
+        execute_command("{}/bin/qmake qttools.pro".format(self.prefixes['qt5base']))
+        execute_command("make")
+        execute_command("make install")
+        os.chdir(current_dir)
+
+        self.prefixes['qt5tools'] = self.prefixes['qt5base']
+
+
 def load_builder(filename="builder.pkl"):
     with open(filename, "rb") as picklefile:
         return pickle.load(picklefile)
