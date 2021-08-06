@@ -102,7 +102,7 @@ class Builder:
         else:
             self.cxx_compiler = cxx_compiler
 
-    
+
     """Configure, build and install project with CMake; return installation prefix."""
     def build_cmake(self, source_dir, cmake_params=None, prefix_dir=None,
                     build_dir=None, build_type="Release"):
@@ -124,13 +124,15 @@ class Builder:
                         "-D CMAKE_CXX_COMPILER={} ".format(self.cxx_compiler) +
                         "{} ".format(cmake_params))
 
+        execute_command("{} --build {} --target all".format(self.cmake_binary, build_dir))
         execute_command("{} --build {} --target install".format(self.cmake_binary, build_dir))
 
         return prefix_dir
 
+
     """Configure project with configure script, build and install with make; return installation prefix."""
     def build_make(self, source_dir, configure_params=None,
-                   prefix_dir=None, prefix_arg="--prefix", build_dir=None):
+                   prefix_dir=None, prefix_arg="--prefix=", build_dir=None):
 
         current_dir = os.getcwd()
         prefix_dir = check_prefix_dif(prefix_dir, source_dir)
@@ -142,8 +144,9 @@ class Builder:
         configure_script = os.path.join(os.path.abspath(source_dir), "configure")
         os.chdir(build_dir)
         execute_command("{} ".format(configure_script) +
-                        "{}={} ".format(prefix_arg, prefix_dir) +
+                        "{}{} ".format(prefix_arg, prefix_dir) +
                         "{} ".format(configure_params))
+        execute_command("make")
         execute_command("make install")
         os.chdir(current_dir)
 
@@ -310,16 +313,16 @@ class Builder:
         download_and_extract_archive(url=url, label="qt5base")
 
         source_dir = "qtbase-everywhere-src-{}".format(version)
-        self.prefixes['qt5base'] = build_make(source_dir=source_dir,
-                                              configure_params="-platform linux-g++ " +
-                                                               "-c++std c++17 "
-                                                               "-opensource " +
-                                                               "-confirm-license " +
-                                                               "-no-opengl " +
-                                                               "-nomake examples " +
-                                                               "-nomake tests ",
-                                              prefix_dir=prefix_dir,
-                                              prefix_arg="-prefix")
+        self.prefixes['qt5base'] = self.build_make(source_dir=source_dir,
+                                                   configure_params="-platform linux-g++ " +
+                                                                    "-c++std c++17 "
+                                                                    "-opensource " +
+                                                                    "-confirm-license " +
+                                                                    "-no-opengl " +
+                                                                    "-nomake examples " +
+                                                                    "-nomake tests ",
+                                                   prefix_dir=prefix_dir,
+                                                   prefix_arg="-prefix ")
 
 
 def load_builder(filename="builder.pkl"):
