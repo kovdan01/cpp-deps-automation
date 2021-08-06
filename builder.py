@@ -246,6 +246,7 @@ class Builder:
         self.prefixes['sqlpp11-mysql'] = self.build_cmake(source_dir=source_dir,
                                                           cmake_params="-D ENABLE_TESTS=OFF " +
                                                                        "-D USE_MARIADB=TRUE " +
+                                                                       "-D BUILD_SHARED_LIBS=TRUE " +
                                                                        "-D CMAKE_PREFIX_PATH=\"{};{}\" ".format(sqlpp11_prefix, date_prefix),
                                                           prefix_dir=prefix_dir)
 
