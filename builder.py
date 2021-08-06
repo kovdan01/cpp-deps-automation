@@ -237,7 +237,7 @@ class Builder:
 
     def build_sqlpp11_mysql(self, version="0.30", prefix_dir=None):
         url = "https://github.com/kovdan01/sqlpp11-connector-mysql/archive/refs/tags/{}.tar.gz".format(version)
-        download_and_extract_archive(url=url, label="sqlpp11_connector_mysql")
+        download_and_extract_archive(url=url, label="sqlpp11_mysql")
 
         sqlpp11_prefix = self.get_prefix("sqlpp11")
         date_prefix = self.get_prefix("date")
@@ -252,7 +252,7 @@ class Builder:
 
     def build_catch2(self, version="2.13.4", prefix_dir=None):
         url = "https://github.com/catchorg/Catch2/archive/v{}.tar.gz".format(version)
-        download_and_extract_archive(url=url, label="yaml")
+        download_and_extract_archive(url=url, label="catch2")
 
         source_dir = "Catch2-{}".format(version)
         self.prefixes['catch2'] = self.build_cmake(source_dir=source_dir,
