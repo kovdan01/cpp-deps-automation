@@ -194,7 +194,7 @@ class Builder:
         self.ninja_binary = os.path.abspath(self.ninja_binary)
 
 
-    def get_prefix(key):
+    def get_prefix(self, key):
         try:
             return self.prefixes[key]
         except KeyError:
@@ -212,16 +212,6 @@ class Builder:
                                                      prefix_dir=prefix_dir)
 
 
-    def build_sqlpp11(self, version="0.60", prefix_dir=None):
-        url = "https://github.com/rbock/sqlpp11/archive/{}.tar.gz".format(version)
-        download_and_extract_archive(url=url, label="sqlpp11")
-
-        source_dir = "sqlpp11-{}".format(version)
-        self.prefixes['sqlpp11'] = self.build_cmake(source_dir=source_dir,
-                                                    cmake_params="-D BUILD_TESTING=OFF",
-                                                    prefix_dir=prefix_dir)
-
-
     def build_date(self, version="3.0.0", prefix_dir=None):
         url = "https://github.com/HowardHinnant/date/archive/v{}.tar.gz".format(version)
         download_and_extract_archive(url=url, label="date")
@@ -231,19 +221,31 @@ class Builder:
                                                  prefix_dir=prefix_dir)
 
 
-    def build_sqlpp11_connector_mysql(self, version="0.29", prefix_dir=None):
-        url = "https://github.com/rbock/sqlpp11-connector-mysql/archive/{}.tar.gz".format(version)
+    def build_sqlpp11(self, version="0.60", prefix_dir=None):
+        url = "https://github.com/rbock/sqlpp11/archive/{}.tar.gz".format(version)
+        download_and_extract_archive(url=url, label="sqlpp11")
+
+        date_prefix = self.get_prefix("date")
+
+        source_dir = "sqlpp11-{}".format(version)
+        self.prefixes['sqlpp11'] = self.build_cmake(source_dir=source_dir,
+                                                    cmake_params="-D BUILD_TESTING=OFF " +
+                                                                 "-D USE_SYSTEM_DATE=TRUE "
+                                                                 "-D CMAKE_PREFIX_PATH=\"{}\" ".format(date_prefix),
+                                                    prefix_dir=prefix_dir)
+
+
+    def build_sqlpp11_mysql(self, version="0.30", prefix_dir=None):
+        url = "https://github.com/kovdan01/sqlpp11-connector-mysql/archive/refs/tags/{}.tar.gz".format(version)
         download_and_extract_archive(url=url, label="sqlpp11_connector_mysql")
 
-        sqlpp11_prefix = get_prefix("sqlpp11")
-        date_prefix = get_prefix("date")
+        sqlpp11_prefix = self.get_prefix("sqlpp11")
+        date_prefix = self.get_prefix("date")
 
         source_dir = "sqlpp11-connector-mysql-{}".format(version)
         self.prefixes['sqlpp11-mysql'] = self.build_cmake(source_dir=source_dir,
                                                           cmake_params="-D ENABLE_TESTS=OFF " +
                                                                        "-D USE_MARIADB=TRUE " +
-                                                                       "-D SQLPP11_INCLUDE_DIR={}/include ".format(sqlpp11_prefix) +
-                                                                       "-D DATE_INCLUDE_DIR={}/include ".format(date_prefix) +
                                                                        "-D CMAKE_PREFIX_PATH=\"{};{}\" ".format(sqlpp11_prefix, date_prefix),
                                                           prefix_dir=prefix_dir)
 
