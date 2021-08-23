@@ -346,6 +346,15 @@ class Builder:
         self.prefixes['qt5tools'] = self.prefixes['qt5base']
 
 
+    def build_liboath(self, version="2.6.7", prefix_dir=None):
+        url = "https://download.savannah.nongnu.org/releases/oath-toolkit/oath-toolkit-{}.tar.gz".format(version)
+        download_and_extract_archive(url=url, label="oath-toolkit")
+
+        source_dir = os.path.join("oath-toolkit-{}".format(version), "liboath")
+        self.prefixes['liboath'] = self.build_make(source_dir=source_dir,
+                                                   prefix_dir=prefix_dir)
+
+
 def load_builder(filename="builder.pkl"):
     with open(filename, "rb") as picklefile:
         return pickle.load(picklefile)
